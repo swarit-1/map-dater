@@ -22,6 +22,7 @@ Map Dater is a backend system designed for digital humanities, museums, and arch
 ✅ **Probabilistic Date Estimation** - Combines multiple signals with confidence weighting
 ✅ **Explanation Generation** - Human-readable justifications for all estimates
 ✅ **Signal Conflict Detection** - Identifies anachronistic or composite maps
+✅ **Interactive Game Mode** 🎮 - Educational gamification layer for learning historical reasoning (See [GAME_README.md](GAME_README.md))
 
 ### Future Extensions
 
@@ -97,6 +98,27 @@ print(f"Year range: {estimate.year_range}")
 print(f"Confidence: {estimate.confidence}")
 print(f"Most likely year: {estimate.most_likely_year}")
 ```
+
+### Play the Interactive Game 🎮
+
+Turn learning into a game! Test your historical knowledge and improve over time.
+
+```bash
+# Interactive game mode
+python examples/play_game.py
+
+# Or watch a demo
+python examples/game_demo.py
+```
+
+**Features:**
+- Guess when maps were created
+- Get scored on accuracy
+- Receive educational feedback
+- Track progress and difficulty progression
+- Learn to recognize historical clues
+
+See [GAME_README.md](GAME_README.md) for complete game documentation.
 
 ## Example Output
 
