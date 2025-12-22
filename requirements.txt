@@ -1,0 +1,26 @@
+# Map Dater - Historical Map Dating System
+# Requirements
+
+# Core dependencies
+numpy>=1.21.0
+
+# Image processing
+opencv-python>=4.5.0
+Pillow>=9.0.0
+
+# OCR
+pytesseract>=0.3.8
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=3.0.0
+
+# Optional: For future ML features
+# scikit-learn>=1.0.0
+# torch>=1.10.0
+# transformers>=4.15.0
+
+# Development
+black>=22.0.0
+flake8>=4.0.0
+mypy>=0.950
