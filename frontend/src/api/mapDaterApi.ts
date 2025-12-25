@@ -93,7 +93,7 @@ export async function startGameRound(
  * Mock API to submit a guess for a game round
  */
 export async function submitGuess(
-  roundId: string,
+  _roundId: string,
   guess: number | [number, number]
 ): Promise<GameResultResponse> {
   await new Promise(resolve => setTimeout(resolve, 1500));

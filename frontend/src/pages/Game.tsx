@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { GameMapFrame } from '../components/GameMapFrame';
 import { ScoreSeal } from '../components/ScoreSeal';
 import { FeedbackPanel } from '../components/FeedbackPanel';
-import { startGameRound, submitGuess, GameRoundResponse, GameResultResponse } from '../api/mapDaterApi';
+import { startGameRound, submitGuess } from '../api/mapDaterApi';
+import type { GameRoundResponse, GameResultResponse } from '../api/mapDaterApi';
 
 type GuessType = 'single' | 'range';
 

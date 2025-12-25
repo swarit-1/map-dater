@@ -1,4 +1,4 @@
-import { Evidence } from '../api/mapDaterApi';
+import type { Evidence } from '../api/mapDaterApi';
 
 interface EvidenceCardProps {
   evidence: Evidence;

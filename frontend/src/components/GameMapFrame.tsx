@@ -4,19 +4,6 @@ interface GameMapFrameProps {
 }
 
 export function GameMapFrame({ description, difficulty }: GameMapFrameProps) {
-  const getDifficultyColor = (level: string) => {
-    switch (level) {
-      case 'beginner':
-        return 'text-accent-green';
-      case 'intermediate':
-        return 'text-accent-blue';
-      case 'expert':
-        return 'text-accent-red';
-      default:
-        return 'text-sepia-700';
-    }
-  };
-
   const getDifficultyBadge = (level: string) => {
     switch (level) {
       case 'beginner':

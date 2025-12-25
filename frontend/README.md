@@ -11,10 +11,10 @@ Map Dater allows users to:
 
 ## Tech Stack
 
-- **React 18** with TypeScript
-- **Vite** - Fast build tool and dev server
-- **Tailwind CSS** - Utility-first styling with custom parchment/sepia theme
-- **React Router** - Client-side routing
+- **React 19** with TypeScript 5.9
+- **Vite 7** - Fast build tool and dev server
+- **Tailwind CSS 3.4** - Utility-first styling with custom parchment/sepia theme
+- **React Router 7** - Client-side routing
 - **Google Fonts** - Playfair Display (headings) and Merriweather (body)
 
 ## Installation
@@ -322,6 +322,15 @@ Potential features not yet implemented:
 - Advanced filtering in evidence view
 - Comparison mode (multiple maps side-by-side)
 - Export analysis reports as PDF
+
+## Related Documentation
+
+For the full Map Dater system:
+- **[Main README](../README.md)** - Complete project documentation
+- **[QUICKSTART.md](../QUICKSTART.md)** - Quick setup guide for both frontend and backend
+- **[ENV_SETUP.md](../ENV_SETUP.md)** - Backend API key configuration
+- **[GAME_README.md](../GAME_README.md)** - Game mode mechanics
+- **[CHANGES_SUMMARY.md](../CHANGES_SUMMARY.md)** - Recent updates including AI features
 
 ## License
 

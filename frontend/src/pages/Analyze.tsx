@@ -4,7 +4,8 @@ import { MapUploadPanel } from '../components/MapUploadPanel';
 import { DateEstimatePanel } from '../components/DateEstimatePanel';
 import { ConfidenceBar } from '../components/ConfidenceBar';
 import { EvidenceCard } from '../components/EvidenceCard';
-import { analyzeMap, DateEstimateResponse } from '../api/mapDaterApi';
+import type { DateEstimateResponse } from '../api/mapDaterApi';
+import { analyzeMap } from '../api/mapDaterApi';
 
 export function Analyze() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);

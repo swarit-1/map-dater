@@ -45,6 +45,9 @@ data/sample_maps/*.png
 data/knowledge_base/*.json
 *.log
 
+# Environment variables
+.env
+
 # Processed outputs
 *_processed.png
 output/
