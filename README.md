@@ -4,7 +4,7 @@ A serious, explainable system for estimating when historical maps were created b
 
 ## Overview
 
-Map Dater is a backend system designed for digital humanities, museums, and archival research. It provides:
+Map Dater is a full-stack system designed for digital humanities, museums, and archival research. It provides both a Python backend for analysis and a React web interface for easy interaction. The system includes:
 
 - **Automated date estimation** from map images
 - **Explainable AI** - every estimate comes with clear reasoning
@@ -40,6 +40,20 @@ Map Dater is a backend system designed for digital humanities, museums, and arch
 
 ## Architecture
 
+### Full-Stack Application
+
+```
+┌─────────────────────┐         ┌──────────────────────┐
+│  React Frontend     │         │  FastAPI Backend     │
+│  TypeScript + Vite  │ HTTP    │  Python 3.8+         │
+│  Port: 5173         │ ──────> │  Port: 8000          │
+│                     │         │                      │
+│  - Upload UI        │         │  - OCR Processing    │
+│  - Results Display  │         │  - AI Analysis       │
+│  - Game Interface   │         │  - Game Engine       │
+└─────────────────────┘         └──────────────────────┘
+```
+
 ### Backend (Python)
 
 ```
@@ -54,6 +68,8 @@ src/
 ├── game/              # Game mode logic and scoring
 ├── feedback/          # Hint and feedback generation
 └── pipeline.py        # End-to-end orchestrator
+
+api_server.py          # FastAPI REST API server
 ```
 
 ### Frontend (React/TypeScript)
@@ -63,7 +79,7 @@ frontend/
 ├── src/
 │   ├── pages/          # Home, Analyze, Game pages
 │   ├── components/     # Reusable React components
-│   ├── api/            # API client (currently mock data)
+│   ├── api/            # FastAPI backend integration
 │   ├── styles/         # Tailwind CSS configuration
 │   └── utils/          # Helper functions
 ├── public/             # Static assets
@@ -94,6 +110,9 @@ pip install -r requirements.txt
 - `python-dotenv` - For environment variable management
 - `opencv-python` - Enhanced image preprocessing
 - `pytesseract` - OCR capabilities
+- `fastapi` - Web API framework
+- `uvicorn` - ASGI server for the API
+- `python-multipart` - File upload support
 
 ### Configure Environment
 
@@ -118,6 +137,38 @@ The `.env` file contains all configuration options:
 - See `.env.example` for all available options with documentation
 
 ## Quick Start
+
+### Full-Stack Application (Recommended)
+
+Run both the backend API and frontend together:
+
+**Terminal 1 - Start Backend API:**
+```bash
+python api_server.py
+```
+
+Backend will run on **http://localhost:8000**
+- API Documentation: http://localhost:8000/docs
+- Health Check: http://localhost:8000/
+
+**Terminal 2 - Start Frontend:**
+```bash
+cd frontend
+npm install  # First time only
+npm run dev
+```
+
+Frontend will run on **http://localhost:5173**
+
+Then open your browser to **http://localhost:5173** to use the web interface!
+
+**Features available in the web interface:**
+- Upload and analyze historical maps
+- View detailed date estimates with evidence
+- Play the interactive map dating game
+- Learn about historical cartography
+
+See [INTEGRATION_COMPLETE.md](INTEGRATION_COMPLETE.md) for full integration guide and [BACKEND_SETUP.md](BACKEND_SETUP.md) for API documentation.
 
 ### Backend (Command Line)
 
@@ -158,7 +209,9 @@ print(f"Confidence: {estimate.confidence}")
 print(f"Most likely year: {estimate.most_likely_year}")
 ```
 
-### Frontend (Web Interface)
+### Frontend (Standalone Development)
+
+The frontend can also be developed independently with mock data:
 
 ```bash
 # Navigate to frontend
@@ -172,6 +225,8 @@ npm run dev
 ```
 
 Open your browser to **http://localhost:5173**
+
+**Note:** For full functionality, run both backend API and frontend together (see "Full-Stack Application" above).
 
 **Frontend Pages:**
 - `/` - Home page with navigation
@@ -241,6 +296,46 @@ python examples/game_demo.py
 - Learn to recognize historical clues
 
 See [GAME_README.md](GAME_README.md) for complete game documentation.
+
+## REST API Endpoints
+
+The FastAPI backend provides the following endpoints (see [BACKEND_SETUP.md](BACKEND_SETUP.md) for full documentation):
+
+### Health Check
+```bash
+GET http://localhost:8000/
+```
+Returns API status and version.
+
+### Analyze Map
+```bash
+POST http://localhost:8000/analyze
+```
+Upload and analyze a historical map image.
+
+**Response:**
+```json
+{
+  "date_range": [1949, 1990],
+  "most_likely_year": 1970,
+  "confidence": 0.87,
+  "evidence": [...]
+}
+```
+
+### Start Game Round
+```bash
+POST http://localhost:8000/game/start?difficulty=beginner
+```
+Start a new game round (difficulty: beginner, intermediate, expert).
+
+### Submit Guess
+```bash
+POST http://localhost:8000/game/submit
+```
+Submit a guess and receive score with feedback.
+
+**Interactive Docs:** Visit http://localhost:8000/docs when the backend is running to test all endpoints in your browser.
 
 ## Example Output
 
@@ -440,7 +535,13 @@ python -m pytest tests/unit/test_models.py -v
 - ✅ Infrastructure detection
 - ✅ OCR visualization and debugging tools
 
-### Phase 3: Advanced Features
+### Phase 3: Web Application ✅
+- ✅ React frontend with TypeScript
+- ✅ FastAPI backend server
+- ✅ REST API with automatic documentation
+- ✅ Full-stack integration
+
+### Phase 4: Advanced Features
 - Geographic entity disambiguation
 - Multi-language OCR
 - Comparative dating (similarity to known maps)
@@ -448,12 +549,23 @@ python -m pytest tests/unit/test_models.py -v
 
 ## Documentation
 
-- **[README.md](README.md)** - Main documentation (you are here)
-- **[QUICKSTART.md](QUICKSTART.md)** - Quick setup guide
-- **[ENV_SETUP.md](ENV_SETUP.md)** - Detailed environment configuration guide
+### Getting Started
+- **[QUICKSTART.md](QUICKSTART.md)** - Quick setup guide (includes full-stack setup)
+- **[INTEGRATION_COMPLETE.md](INTEGRATION_COMPLETE.md)** - Complete frontend-backend integration guide
+- **[ENV_SETUP.md](ENV_SETUP.md)** - Environment and API key configuration
+
+### API & Backend
+- **[BACKEND_SETUP.md](BACKEND_SETUP.md)** - FastAPI backend server documentation
+- **API Docs**: http://localhost:8000/docs (when server is running)
+
+### Frontend
+- **[frontend/README.md](frontend/README.md)** - React frontend architecture and development
+
+### Features & Guides
 - **[GAME_README.md](GAME_README.md)** - Interactive game mode documentation
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to extend the system
 - **[GAMIFICATION_SUMMARY.md](GAMIFICATION_SUMMARY.md)** - Gamification features
+- **[CHANGES_SUMMARY.md](CHANGES_SUMMARY.md)** - Recent updates and AI features
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to extend the system
 
 ## Contributing
 

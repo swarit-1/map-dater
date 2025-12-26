@@ -1,0 +1,29 @@
+[
+  {
+    "map_id": "mock_cold_war_1",
+    "source": "Mock Archive",
+    "url": null,
+    "region": "Europe",
+    "known_date": null,
+    "image_path": "C:\\Users\\swart\\mapdater\\map-dater\\data\\sample_maps\\mock_map_cold_war.png",
+    "description": "Cold War era map showing USSR and divided Germany"
+  },
+  {
+    "map_id": "mock_post_ww1_1",
+    "source": "Mock Archive",
+    "url": null,
+    "region": "Europe",
+    "known_date": null,
+    "image_path": "C:\\Users\\swart\\mapdater\\map-dater\\data\\sample_maps\\mock_map_post_ww1.png",
+    "description": "Post-WWI map showing new nations like Czechoslovakia"
+  },
+  {
+    "map_id": "mock_modern_1",
+    "source": "Mock Archive",
+    "url": null,
+    "region": "World",
+    "known_date": null,
+    "image_path": "C:\\Users\\swart\\mapdater\\map-dater\\data\\sample_maps\\mock_map_modern.png",
+    "description": "Modern map with current country names"
+  }
+]

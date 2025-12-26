@@ -105,7 +105,7 @@ The web interface includes three pages:
 2. **Analyze (/analyze)** - Upload and analyze historical maps
 3. **Game (/game)** - Interactive map dating game
 
-**Note:** The frontend currently uses mock API responses. To connect to the Python backend, you'll need to set up API endpoints (see Backend Integration section below).
+**Note:** The frontend is now connected to a FastAPI backend. See "Running the Full Stack" below to start both servers.
 
 ## Immediate Testing (No Map Required)
 
@@ -389,11 +389,14 @@ npm run dev
 
 ### Both (Full Stack)
 ```bash
-# Terminal 1: Backend
-python -m src.api.server  # (when implemented)
+# Terminal 1: Start backend API
+python api_server.py
+# Backend runs on http://localhost:8000
+# API docs at http://localhost:8000/docs
 
-# Terminal 2: Frontend
+# Terminal 2: Start frontend
 cd frontend && npm run dev
+# Frontend runs on http://localhost:5173
 ```
 
 ## Next Steps
@@ -428,24 +431,61 @@ cd frontend && npm run dev
 - See examples in `examples/` directory
 - Open an issue on GitHub
 
-## Backend Integration (Optional)
+## Running the Full Stack
 
-The frontend is designed to work with the Python backend but currently uses mock data for demonstration.
+The system now includes a complete FastAPI backend that connects to the React frontend.
 
-### Running Both Backend and Frontend
+### Starting Both Servers
 
 **Terminal 1 - Backend API Server:**
 ```bash
-# Create a simple Flask/FastAPI server (example)
-# See examples/ directory for server implementation
-python -m src.api.server
+# Option 1: Direct Python
+python api_server.py
+
+# Option 2: With auto-reload (development)
+uvicorn api_server:app --reload
+
+# Option 3: Use convenience script
+# Windows: start_backend.bat
+# Linux/Mac: ./start_backend.sh
 ```
+
+The backend will start on **http://localhost:8000**
+- API Documentation: http://localhost:8000/docs
+- Health Check: http://localhost:8000/
 
 **Terminal 2 - Frontend Development:**
 ```bash
 cd frontend
 npm run dev
 ```
+
+The frontend will start on **http://localhost:5173**
+
+### What You Can Do
+
+Once both servers are running:
+
+1. **Analyze Maps** - Upload a historical map image and get:
+   - Estimated date range
+   - Confidence score
+   - Historical evidence with explanations
+
+2. **Play the Game** - Test your knowledge:
+   - Guess when maps were created
+   - Get scored based on accuracy
+   - Learn from detailed feedback
+
+### API Endpoints
+
+The backend provides these endpoints:
+
+- `GET /` - Health check
+- `POST /analyze` - Upload and analyze a map image
+- `POST /game/start?difficulty=beginner` - Start a new game round
+- `POST /game/submit` - Submit a guess
+
+For detailed API documentation, see [BACKEND_SETUP.md](BACKEND_SETUP.md) or visit http://localhost:8000/docs when the server is running.
 
 ### Current Architecture
 
@@ -490,10 +530,10 @@ npm run dev
 
 ## What This System Doesn't Do (Yet)
 
-❌ Live backend connection (currently uses mock data in frontend)
 ❌ Multi-language OCR (currently English-optimized)
 ❌ Ancient maps (pre-1500s)
 ❌ Distinguish reproductions from originals
 ❌ Real-time processing (AI analysis takes 10-30 seconds)
+❌ User authentication/saved history
 
 See `CONTRIBUTING.md` for how to add these features.
