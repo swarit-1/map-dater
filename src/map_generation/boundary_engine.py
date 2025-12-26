@@ -2,7 +2,8 @@
 Boundary Engine for Historical Map Generation.
 
 Translates historical entities into geopolitical boundaries.
-Uses simplified world boundary templates with historical transformations.
+Uses real geographic data from Thenmap API and historical-basemaps when available,
+with fallback to simplified templates.
 """
 
 from dataclasses import dataclass, field
@@ -15,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from models import YearRange
 from .historical_state_resolver import ResolvedState, ResolvedEntity
+from .geo_data_fetcher import GeoDataFetcher, GeoDataResult, GeoFeature
 
 
 @dataclass
@@ -228,9 +230,17 @@ class BoundaryEngine:
         'British Empire': '#DC143C',
     }
 
-    def __init__(self):
-        """Initialize the boundary engine."""
-        pass
+    def __init__(self, use_real_data: bool = True, use_cache: bool = True):
+        """
+        Initialize the boundary engine.
+
+        Args:
+            use_real_data: Whether to fetch real geographic data from APIs
+            use_cache: Whether to cache downloaded geographic data
+        """
+        self.use_real_data = use_real_data
+        self.geo_fetcher = GeoDataFetcher(use_cache=use_cache) if use_real_data else None
+        self._real_data_cache: Dict[int, GeoDataResult] = {}
 
     def generate_boundaries(self, resolved_state: ResolvedState) -> BoundarySet:
         """
@@ -246,13 +256,44 @@ class BoundaryEngine:
         uncertainty_regions = []
         notes = []
 
-        # Generate polygons for dominant entities
-        for entity in resolved_state.dominant_entities:
-            polygon = self._create_entity_polygon(entity, resolved_state.date_range)
-            if polygon:
-                polygons.append(polygon)
+        # Try to fetch real geographic data first
+        real_data = None
+        if self.use_real_data and self.geo_fetcher:
+            year = resolved_state.date_range.start
+            real_data = self._fetch_real_boundaries(year)
 
-            # Check for uncertainty
+        if real_data and real_data.success and real_data.features:
+            # Use real geographic data
+            notes.append(f"Using real boundary data from {real_data.source}")
+            notes.append(f"Data date: {real_data.date_used}")
+
+            # Get list of entity names we're interested in
+            entity_names = {e.name.lower() for e in resolved_state.dominant_entities}
+            entity_canonical = {e.canonical_name.lower() for e in resolved_state.dominant_entities}
+            all_names = entity_names | entity_canonical
+
+            # Convert GeoJSON features to polygons
+            for feature in real_data.features:
+                polygon = self._convert_geojson_feature(feature, resolved_state)
+                if polygon:
+                    polygons.append(polygon)
+
+            notes.append(f"Loaded {len(polygons)} real boundary polygons")
+
+        else:
+            # Fallback to simplified templates
+            if real_data and real_data.error:
+                notes.append(f"Could not fetch real data: {real_data.error}")
+            notes.append("Using simplified boundary templates (fallback)")
+
+            # Generate polygons for dominant entities using simplified method
+            for entity in resolved_state.dominant_entities:
+                polygon = self._create_entity_polygon(entity, resolved_state.date_range)
+                if polygon:
+                    polygons.append(polygon)
+
+        # Check for uncertainty on all entities
+        for entity in resolved_state.dominant_entities:
             if entity.confidence < 0.9:
                 uncertainty_region = self._create_uncertainty_region(
                     entity, resolved_state.date_range
@@ -261,7 +302,7 @@ class BoundaryEngine:
                     uncertainty_regions.append(uncertainty_region)
 
         # Add notes about generation
-        notes.append(f"Generated {len(polygons)} territory polygons")
+        notes.append(f"Total: {len(polygons)} territory polygons")
         notes.append(f"Identified {len(uncertainty_regions)} uncertain regions")
 
         if resolved_state.conflicts:
@@ -269,18 +310,110 @@ class BoundaryEngine:
                 f"Resolved {len(resolved_state.conflicts)} entity conflicts"
             )
 
-        # Note about approximations
-        notes.append(
-            "Boundaries are approximated using simplified templates. "
-            "Exact historical borders may vary."
-        )
-
         return BoundarySet(
             polygons=polygons,
             uncertainty_regions=uncertainty_regions,
             date_range=resolved_state.date_range,
             notes=notes
         )
+
+    def _fetch_real_boundaries(self, year: int) -> Optional[GeoDataResult]:
+        """Fetch real boundary data for a year, with caching."""
+        if year in self._real_data_cache:
+            return self._real_data_cache[year]
+
+        try:
+            result = self.geo_fetcher.fetch_boundaries_for_year(year)
+            self._real_data_cache[year] = result
+            return result
+        except Exception as e:
+            return GeoDataResult(
+                success=False,
+                error=f"Failed to fetch boundaries: {str(e)}"
+            )
+
+    def _convert_geojson_feature(
+        self,
+        feature: GeoFeature,
+        resolved_state: ResolvedState
+    ) -> Optional[Polygon]:
+        """Convert a GeoJSON feature to a Polygon."""
+        if not feature.coordinates:
+            return None
+
+        # Extract coordinates based on geometry type
+        if feature.geometry_type == "Polygon":
+            # Use the first ring (exterior boundary)
+            if feature.coordinates and len(feature.coordinates) > 0:
+                coords = feature.coordinates[0]
+            else:
+                return None
+        elif feature.geometry_type == "MultiPolygon":
+            # Use the largest polygon (first one typically)
+            if feature.coordinates and len(feature.coordinates) > 0:
+                # Find the polygon with the most points
+                largest = max(feature.coordinates, key=lambda p: len(p[0]) if p else 0)
+                coords = largest[0] if largest else []
+            else:
+                return None
+        else:
+            return None
+
+        if not coords or len(coords) < 3:
+            return None
+
+        # Convert coordinates to Points
+        # GeoJSON is [longitude, latitude]
+        points = [Point(coord[0], coord[1]) for coord in coords if len(coord) >= 2]
+
+        if len(points) < 3:
+            return None
+
+        # Determine color based on entity name
+        name = feature.name
+        fill_color = self.COLOR_PALETTE.get(
+            name,
+            self.COLOR_PALETTE.get('country', '#E8D4B8')
+        )
+
+        # Check if this entity is in our resolved state (for highlighting)
+        entity_match = None
+        for entity in resolved_state.dominant_entities:
+            if (name.lower() == entity.name.lower() or
+                name.lower() == entity.canonical_name.lower()):
+                entity_match = entity
+                fill_color = self.COLOR_PALETTE.get(
+                    entity.name,
+                    self.COLOR_PALETTE.get(entity.entity_type, fill_color)
+                )
+                break
+
+        # Calculate centroid for label
+        centroid = self._calculate_centroid(points)
+
+        return Polygon(
+            points=points,
+            entity_name=name,
+            entity_type='country',
+            fill_color=fill_color,
+            border_color='#333333',
+            label_position=centroid,
+            uncertainty=0.1 if entity_match else 0.0,
+            metadata={
+                'source': 'geojson',
+                'properties': feature.properties
+            }
+        )
+
+    def _calculate_centroid(self, points: List[Point]) -> Point:
+        """Calculate the centroid of a polygon."""
+        if not points:
+            return Point(0, 0)
+
+        sum_x = sum(p.x for p in points)
+        sum_y = sum(p.y for p in points)
+        n = len(points)
+        return Point(sum_x / n, sum_y / n)
 
     def _create_entity_polygon(
         self,
