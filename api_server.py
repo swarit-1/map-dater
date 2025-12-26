@@ -2,27 +2,32 @@
 FastAPI backend for Map Dater web application.
 
 Provides REST API endpoints for:
-- Map analysis
+- Map analysis (image -> date)
+- Map generation (date -> image)
 - Game rounds
 - Guess submission
 """
 
 import sys
 import uuid
+import base64
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional, List
 from tempfile import NamedTemporaryFile
 
 # Add src to path
 sys.path.append(str(Path(__file__).parent / 'src'))
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from pipeline import MapDaterPipeline
 from game.game_engine import GameEngine
 from game.game_models import UserGuess, DifficultyLevel
+from map_generation import generate_map_from_date, MapGenerationPipeline
+from map_generation.date_parser import DateParseError
 
 
 # Pydantic models for request/response
@@ -58,6 +63,58 @@ class GameResultResponse(BaseModel):
         ...,
         description="System estimate with 'range' and 'most_likely' keys"
     )
+
+
+# Map Generation Models
+class MapGenerationEntity(BaseModel):
+    """Entity shown on a generated map."""
+    name: str
+    canonical_name: str
+    type: str
+    valid_range: tuple[int, int]
+    confidence: float
+
+
+class UncertaintyFactor(BaseModel):
+    """A factor contributing to map uncertainty."""
+    type: str
+    description: str
+    severity: float
+    affected_entities: list[str] = []
+    recommendations: list[str] = []
+
+
+class MapGenerationUncertainty(BaseModel):
+    """Uncertainty assessment for a generated map."""
+    uncertainty_score: float
+    confidence: float
+    risk_level: str
+    factors: list[UncertaintyFactor]
+    notes: list[str]
+
+
+class MapGenerationResponse(BaseModel):
+    """Response for map generation endpoint."""
+    date_range: tuple[int, int]
+    entities_shown: list[MapGenerationEntity]
+    assumptions: list[str]
+    uncertainty: MapGenerationUncertainty
+    confidence: float
+    risk_level: str
+    image_base64: Optional[str] = None  # Base64 encoded image (if requested)
+    metadata: dict = {}
+
+
+class MapGenerationPreview(BaseModel):
+    """Preview of what would be generated (no image)."""
+    date_range: tuple[int, int]
+    is_single_year: bool
+    midpoint: int
+    entities_count: int
+    dominant_entities: list[str]
+    conflicts: list[dict]
+    risk_assessment: dict
+    assumptions: list[str]
 
 
 # Create FastAPI app
@@ -269,6 +326,221 @@ async def submit_game_guess(request: GameSubmitRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to submit guess: {str(e)}")
+
+
+# =============================================================================
+# Map Generation Endpoints (Date -> Map)
+# =============================================================================
+
+# Global map generation pipeline
+map_gen_pipeline = None
+
+
+def get_map_gen_pipeline() -> MapGenerationPipeline:
+    """Lazy-load the map generation pipeline."""
+    global map_gen_pipeline
+    if map_gen_pipeline is None:
+        print("Initializing Map Generation pipeline...")
+        map_gen_pipeline = MapGenerationPipeline(verbose=False)
+        print("Map Generation pipeline ready!")
+    return map_gen_pipeline
+
+
+@app.post("/generate", response_model=MapGenerationResponse)
+async def generate_map(
+    date: str = Query(..., description="Date or date range (e.g., '1914' or '1918-1939')"),
+    include_image: bool = Query(True, description="Include base64 encoded image in response"),
+    format: str = Query("svg", description="Image format: 'png' or 'svg'")
+):
+    """
+    Generate a historical map for a given date or date range.
+
+    This is the inverse of map analysis:
+    - Map analysis: Image -> Date estimate
+    - Map generation: Date -> Image
+
+    Args:
+        date: Year (e.g., "1914") or range (e.g., "1918-1939")
+        include_image: Whether to include base64 image in response
+        format: Output format ('png' or 'svg')
+
+    Returns:
+        MapGenerationResponse with entities, assumptions, uncertainty, and optionally image
+    """
+    try:
+        pipeline = get_map_gen_pipeline()
+        result = pipeline.generate(date, output_format=format)
+
+        # Convert entities to response format
+        entities = [
+            MapGenerationEntity(
+                name=e['name'],
+                canonical_name=e['canonical_name'],
+                type=e['type'],
+                valid_range=tuple(e['valid_range']),
+                confidence=e['confidence']
+            )
+            for e in result.entities_shown
+        ]
+
+        # Convert uncertainty factors
+        factors = [
+            UncertaintyFactor(
+                type=f.factor_type,
+                description=f.description,
+                severity=f.severity,
+                affected_entities=f.affected_entities,
+                recommendations=f.recommendations
+            )
+            for f in result.uncertainty.factors
+        ]
+
+        uncertainty = MapGenerationUncertainty(
+            uncertainty_score=result.uncertainty.overall_score,
+            confidence=result.uncertainty.confidence,
+            risk_level=result.uncertainty.risk_level,
+            factors=factors,
+            notes=result.uncertainty.notes
+        )
+
+        # Base64 encode image if requested
+        image_base64 = None
+        if include_image:
+            image_base64 = base64.b64encode(result.image_data).decode('utf-8')
+
+        return MapGenerationResponse(
+            date_range=(result.date_range.start, result.date_range.end),
+            entities_shown=entities,
+            assumptions=result.assumptions,
+            uncertainty=uncertainty,
+            confidence=result.confidence,
+            risk_level=result.risk_level,
+            image_base64=image_base64,
+            metadata=result.metadata
+        )
+
+    except DateParseError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error generating map: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Map generation failed: {str(e)}")
+
+
+@app.get("/generate/image")
+async def generate_map_image(
+    date: str = Query(..., description="Date or date range (e.g., '1914' or '1918-1939')"),
+    format: str = Query("svg", description="Image format: 'png' or 'svg'")
+):
+    """
+    Generate and return just the map image.
+
+    Returns the image directly (not JSON wrapped) for easy embedding.
+
+    Args:
+        date: Year (e.g., "1914") or range (e.g., "1918-1939")
+        format: Output format ('png' or 'svg')
+
+    Returns:
+        Image file (PNG or SVG)
+    """
+    try:
+        pipeline = get_map_gen_pipeline()
+        result = pipeline.generate(date, output_format=format)
+
+        if format.lower() == 'svg':
+            return Response(
+                content=result.image_data,
+                media_type="image/svg+xml",
+                headers={"Content-Disposition": f"inline; filename=map_{date}.svg"}
+            )
+        else:
+            return Response(
+                content=result.image_data,
+                media_type="image/png",
+                headers={"Content-Disposition": f"inline; filename=map_{date}.png"}
+            )
+
+    except DateParseError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error generating map image: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Map generation failed: {str(e)}")
+
+
+@app.get("/generate/preview", response_model=MapGenerationPreview)
+async def preview_map_generation(
+    date: str = Query(..., description="Date or date range (e.g., '1914' or '1918-1939')")
+):
+    """
+    Preview what would be generated without actually rendering.
+
+    Useful for:
+    - Validating date input
+    - Quick uncertainty assessment
+    - Understanding what entities would be shown
+
+    Args:
+        date: Year (e.g., "1914") or range (e.g., "1918-1939")
+
+    Returns:
+        MapGenerationPreview with entities and risk assessment
+    """
+    try:
+        pipeline = get_map_gen_pipeline()
+        preview = pipeline.preview(date)
+
+        return MapGenerationPreview(
+            date_range=tuple(preview['date_range']),
+            is_single_year=preview['is_single_year'],
+            midpoint=preview['midpoint'],
+            entities_count=preview['entities_count'],
+            dominant_entities=preview['dominant_entities'],
+            conflicts=preview['conflicts'],
+            risk_assessment=preview['risk_assessment'],
+            assumptions=preview['assumptions']
+        )
+
+    except DateParseError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error previewing map: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Preview failed: {str(e)}")
+
+
+@app.get("/generate/entities")
+async def get_entities_for_year(
+    year: int = Query(..., description="Year to query", ge=1500, le=2100)
+):
+    """
+    Get all known entities that existed in a specific year.
+
+    Useful for understanding what political entities the system knows about.
+
+    Args:
+        year: Year to query (1500-2100)
+
+    Returns:
+        List of entities valid in that year
+    """
+    try:
+        pipeline = get_map_gen_pipeline()
+        entities = pipeline.get_entities_for_year(year)
+
+        return {
+            "year": year,
+            "entity_count": len(entities),
+            "entities": entities
+        }
+
+    except Exception as e:
+        print(f"Error getting entities: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get entities: {str(e)}")
 
 
 if __name__ == "__main__":

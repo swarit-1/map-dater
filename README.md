@@ -31,6 +31,7 @@ Map Dater is a full-stack system designed for digital humanities, museums, and a
 ✅ **Explanation Generation** - Human-readable justifications for all estimates
 ✅ **Signal Conflict Detection** - Identifies anachronistic or composite maps
 ✅ **Interactive Game Mode** 🎮 - Educational gamification layer for learning historical reasoning (See [GAME_README.md](GAME_README.md))
+✅ **Map Generation** 🗺️ - Generate historically accurate world maps from any date (inverse of dating)
 
 ### Future Extensions
 
@@ -65,6 +66,7 @@ src/
 ├── visual_features/   # AI-powered visual analysis with Claude
 ├── inference/         # Probabilistic date estimation
 ├── explanations/      # Human-readable explanation generation
+├── map_generation/    # Historical map generation (date -> image)
 ├── game/              # Game mode logic and scoring
 ├── feedback/          # Hint and feedback generation
 └── pipeline.py        # End-to-end orchestrator
@@ -164,6 +166,7 @@ Then open your browser to **http://localhost:5173** to use the web interface!
 
 **Features available in the web interface:**
 - Upload and analyze historical maps
+- Generate historical maps for any date
 - View detailed date estimates with evidence
 - Play the interactive map dating game
 - Learn about historical cartography
@@ -231,6 +234,7 @@ Open your browser to **http://localhost:5173**
 **Frontend Pages:**
 - `/` - Home page with navigation
 - `/analyze` - Upload and analyze maps
+- `/generate` - Generate historical maps from dates
 - `/game` - Interactive map dating game
 
 ### Try AI-Powered Analysis 🤖
@@ -334,6 +338,35 @@ Start a new game round (difficulty: beginner, intermediate, expert).
 POST http://localhost:8000/game/submit
 ```
 Submit a guess and receive score with feedback.
+
+### Generate Map (Date -> Image)
+```bash
+POST http://localhost:8000/generate?date=1914
+```
+Generate a historical map for a specific year or date range.
+
+**Response:**
+```json
+{
+  "date_range": [1914, 1914],
+  "entities_shown": [...],
+  "confidence": 0.55,
+  "risk_level": "medium",
+  "image_base64": "..."
+}
+```
+
+### Get Map Image
+```bash
+GET http://localhost:8000/generate/image?date=1914&format=svg
+```
+Returns the generated map image directly (SVG or PNG).
+
+### Preview Generation
+```bash
+GET http://localhost:8000/generate/preview?date=1918-1939
+```
+Preview what would be generated without rendering the image.
 
 **Interactive Docs:** Visit http://localhost:8000/docs when the backend is running to test all endpoints in your browser.
 

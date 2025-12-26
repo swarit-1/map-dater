@@ -99,11 +99,12 @@ The frontend will start on **http://localhost:5173**
 
 #### Frontend Features
 
-The web interface includes three pages:
+The web interface includes four pages:
 
 1. **Home (/)** - Overview and navigation
 2. **Analyze (/analyze)** - Upload and analyze historical maps
-3. **Game (/game)** - Interactive map dating game
+3. **Generate (/generate)** - Generate historical maps from dates
+4. **Game (/game)** - Interactive map dating game
 
 **Note:** The frontend is now connected to a FastAPI backend. See "Running the Full Stack" below to start both servers.
 
@@ -471,7 +472,12 @@ Once both servers are running:
    - Confidence score
    - Historical evidence with explanations
 
-2. **Play the Game** - Test your knowledge:
+2. **Generate Maps** - Enter a year or date range and get:
+   - Historically accurate world map
+   - Political entities for that period
+   - Uncertainty assessment and assumptions
+
+3. **Play the Game** - Test your knowledge:
    - Guess when maps were created
    - Get scored based on accuracy
    - Learn from detailed feedback
@@ -480,10 +486,21 @@ Once both servers are running:
 
 The backend provides these endpoints:
 
-- `GET /` - Health check
+**Map Analysis (Image -> Date)**
 - `POST /analyze` - Upload and analyze a map image
+
+**Map Generation (Date -> Image)**
+- `POST /generate?date=1914` - Generate a historical map
+- `GET /generate/image?date=1914` - Get map image directly
+- `GET /generate/preview?date=1914` - Preview without rendering
+- `GET /generate/entities?year=1914` - List entities for a year
+
+**Game Mode**
 - `POST /game/start?difficulty=beginner` - Start a new game round
 - `POST /game/submit` - Submit a guess
+
+**Health**
+- `GET /` - Health check
 
 For detailed API documentation, see [BACKEND_SETUP.md](BACKEND_SETUP.md) or visit http://localhost:8000/docs when the server is running.
 
@@ -517,6 +534,7 @@ For detailed API documentation, see [BACKEND_SETUP.md](BACKEND_SETUP.md) or visi
 ✅ **AI Visual Analysis** - Analyzes printing techniques, typography, colors, borders
 ✅ **Entity Recognition** - Identifies historical countries, cities, regions
 ✅ **Date Estimation** - Combines OCR, AI vision, and entity signals
+✅ **Map Generation** - Generate historical maps from any date (inverse of dating)
 ✅ **Explanations** - Human-readable justifications with confidence levels
 ✅ **Conflict Detection** - Identifies anachronistic/conflicting entities
 ✅ **Game Mode** - Educational gamification for learning
@@ -524,6 +542,7 @@ For detailed API documentation, see [BACKEND_SETUP.md](BACKEND_SETUP.md) or visi
 ### Frontend Features
 ✅ **Web Interface** - User-friendly React application
 ✅ **Map Upload** - Drag-and-drop map analysis
+✅ **Map Generation** - Generate maps by entering a year or date range
 ✅ **Visual Results** - Interactive date estimates with evidence
 ✅ **Game Mode UI** - Engaging interface for the dating game
 ✅ **Responsive Design** - Works on desktop and mobile
