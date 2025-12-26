@@ -31,6 +31,7 @@ export interface GameRoundResponse {
   round_id: string;
   map_description: string;
   difficulty: 'beginner' | 'intermediate' | 'expert';
+  map_image: string | null;  // Base64 encoded SVG/PNG image
 }
 
 export interface GameResultResponse {

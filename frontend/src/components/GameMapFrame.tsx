@@ -1,9 +1,10 @@
 interface GameMapFrameProps {
   description: string;
   difficulty: 'beginner' | 'intermediate' | 'expert';
+  mapImage?: string | null;  // Base64 encoded SVG image
 }
 
-export function GameMapFrame({ description, difficulty }: GameMapFrameProps) {
+export function GameMapFrame({ description, difficulty, mapImage }: GameMapFrameProps) {
   const getDifficultyBadge = (level: string) => {
     switch (level) {
       case 'beginner':
@@ -16,6 +17,24 @@ export function GameMapFrame({ description, difficulty }: GameMapFrameProps) {
         return 'bg-gray-100 border-gray-600 text-gray-800';
     }
   };
+
+  // Decode base64 SVG to display
+  const getMapImageSrc = () => {
+    if (!mapImage) return null;
+    // Check if it's SVG (starts with the XML declaration or <svg)
+    try {
+      const decoded = atob(mapImage);
+      if (decoded.includes('<svg') || decoded.includes('<?xml')) {
+        return `data:image/svg+xml;base64,${mapImage}`;
+      }
+      // Assume PNG otherwise
+      return `data:image/png;base64,${mapImage}`;
+    } catch {
+      return `data:image/svg+xml;base64,${mapImage}`;
+    }
+  };
+
+  const imageSrc = getMapImageSrc();
 
   return (
     <div className="w-full max-w-3xl mx-auto">
@@ -39,28 +58,37 @@ export function GameMapFrame({ description, difficulty }: GameMapFrameProps) {
         <div className="absolute -bottom-3 -left-3 w-6 h-6 bg-sepia-700 rotate-45"></div>
         <div className="absolute -bottom-3 -right-3 w-6 h-6 bg-sepia-700 rotate-45"></div>
 
-        {/* Mock map image placeholder */}
+        {/* Map display area */}
         <div className="relative aspect-[4/3] bg-parchment-200 rounded border-2 border-sepia-400 overflow-hidden">
-          {/* Simulated map illustration */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center p-8">
-              <svg
-                className="w-32 h-32 mx-auto text-sepia-300 mb-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
-                />
-              </svg>
-              <p className="text-sm font-serif text-sepia-600 italic">[Historical Map]</p>
-              <p className="text-xs text-sepia-500 mt-2">{description}</p>
+          {imageSrc ? (
+            /* Actual map image */
+            <img
+              src={imageSrc}
+              alt="Historical Map"
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            /* Placeholder when no image available */
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center p-8">
+                <svg
+                  className="w-32 h-32 mx-auto text-sepia-300 mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+                  />
+                </svg>
+                <p className="text-sm font-serif text-sepia-600 italic">[Loading Map...]</p>
+                <p className="text-xs text-sepia-500 mt-2">{description}</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Paper texture overlay */}
           <div

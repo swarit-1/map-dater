@@ -381,17 +381,48 @@ class MapRenderer:
             )
         svg_parts.append('')
 
-        # Labels
+        # Labels - only show for major countries to avoid clutter
         if self.config.show_labels:
             svg_parts.append('<!-- Labels -->')
+
+            # Calculate polygon sizes and filter to only show labels for major ones
+            labeled_polygons = []
             for polygon in boundaries.polygons:
                 if polygon.entity_type != 'uncertainty':
-                    label_pos = polygon.get_label_position()
-                    x = self._lon_to_x(label_pos.x)
-                    y = self._lat_to_y(label_pos.y)
+                    # Calculate approximate area based on number of points and spread
+                    if polygon.points:
+                        area = self._estimate_polygon_area(polygon.points)
+                        labeled_polygons.append((polygon, area))
+
+            # Sort by area (largest first) and only label the top N
+            labeled_polygons.sort(key=lambda x: x[1], reverse=True)
+            max_labels = min(40, len(labeled_polygons))  # Limit to top 40 labels
+
+            # Track label positions to avoid overlaps
+            used_positions = []
+            min_distance = 50  # Minimum distance between labels in pixels
+
+            for polygon, area in labeled_polygons[:max_labels]:
+                label_pos = polygon.get_label_position()
+                x = self._lon_to_x(label_pos.x)
+                y = self._lat_to_y(label_pos.y)
+
+                # Check for overlap with existing labels
+                overlaps = False
+                for (ux, uy) in used_positions:
+                    dist = ((x - ux) ** 2 + (y - uy) ** 2) ** 0.5
+                    if dist < min_distance:
+                        overlaps = True
+                        break
+
+                if not overlaps:
+                    used_positions.append((x, y))
+                    # Use smaller font for smaller countries
+                    font_size = self.config.font_size if area > 1000 else self.config.font_size - 2
                     svg_parts.append(
                         f'<text class="label" x="{x}" y="{y}" '
-                        f'text-anchor="middle" dominant-baseline="middle">'
+                        f'text-anchor="middle" dominant-baseline="middle" '
+                        f'style="font-size: {font_size}px;">'
                         f'{polygon.entity_name}</text>'
                     )
             svg_parts.append('')
@@ -444,6 +475,38 @@ class MapRenderer:
             return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
         else:
             return (128, 128, 128)  # Default gray
+
+    def _estimate_polygon_area(self, points: List[Point]) -> float:
+        """
+        Estimate polygon area using the shoelace formula.
+
+        This gives a rough estimate in pixel-space coordinates
+        to help prioritize which country labels to show.
+
+        Args:
+            points: List of Point objects with x (lon) and y (lat) coordinates
+
+        Returns:
+            Approximate area (can be used for relative comparison)
+        """
+        if len(points) < 3:
+            return 0.0
+
+        # Convert to pixel coordinates for consistent area calculation
+        pixel_points = [
+            (self._lon_to_x(p.x), self._lat_to_y(p.y))
+            for p in points
+        ]
+
+        # Shoelace formula for polygon area
+        n = len(pixel_points)
+        area = 0.0
+        for i in range(n):
+            j = (i + 1) % n
+            area += pixel_points[i][0] * pixel_points[j][1]
+            area -= pixel_points[j][0] * pixel_points[i][1]
+
+        return abs(area) / 2.0
 
     def render_to_file(
         self,

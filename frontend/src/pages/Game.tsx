@@ -15,6 +15,7 @@ export function Game() {
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [result, setResult] = useState<GameResultResponse | null>(null);
   const [submittedGuess, setSubmittedGuess] = useState<number | [number, number] | null>(null);
 
@@ -23,6 +24,7 @@ export function Game() {
   }, []);
 
   const loadNewRound = async () => {
+    setIsLoading(true);
     setResult(null);
     setSubmittedGuess(null);
     setSingleYear('');
@@ -34,6 +36,8 @@ export function Game() {
       setGameRound(round);
     } catch (error) {
       console.error('Error loading game round:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -118,12 +122,23 @@ export function Game() {
         </div>
       </div>
 
+      {/* Loading state */}
+      {isLoading && (
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-parchment-50 border-2 border-sepia-400 rounded-lg p-12 shadow-paper text-center">
+            <div className="animate-spin w-12 h-12 border-4 border-sepia-300 border-t-sepia-600 rounded-full mx-auto mb-4"></div>
+            <p className="text-sepia-600 font-serif">Generating historical map...</p>
+            <p className="text-sm text-sepia-500 mt-2">This may take a few seconds</p>
+          </div>
+        </div>
+      )}
+
       {/* Main content */}
-      {gameRound && (
+      {!isLoading && gameRound && (
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Map display */}
           <div className="bg-parchment-50 border-2 border-sepia-400 rounded-lg p-8 shadow-paper">
-            <GameMapFrame description={gameRound.map_description} difficulty={gameRound.difficulty} />
+            <GameMapFrame description={gameRound.map_description} difficulty={gameRound.difficulty} mapImage={gameRound.map_image} />
           </div>
 
           {/* Guess input (only show before submission) */}

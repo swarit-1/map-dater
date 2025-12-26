@@ -274,9 +274,9 @@ class BoundaryEngine:
 
             # Convert GeoJSON features to polygons
             for feature in real_data.features:
-                polygon = self._convert_geojson_feature(feature, resolved_state)
-                if polygon:
-                    polygons.append(polygon)
+                feature_polygons = self._convert_geojson_feature(feature, resolved_state)
+                if feature_polygons:
+                    polygons.extend(feature_polygons)
 
             notes.append(f"Loaded {len(polygons)} real boundary polygons")
 
@@ -336,37 +336,9 @@ class BoundaryEngine:
         self,
         feature: GeoFeature,
         resolved_state: ResolvedState
-    ) -> Optional[Polygon]:
-        """Convert a GeoJSON feature to a Polygon."""
+    ) -> Optional[List[Polygon]]:
+        """Convert a GeoJSON feature to one or more Polygons."""
         if not feature.coordinates:
-            return None
-
-        # Extract coordinates based on geometry type
-        if feature.geometry_type == "Polygon":
-            # Use the first ring (exterior boundary)
-            if feature.coordinates and len(feature.coordinates) > 0:
-                coords = feature.coordinates[0]
-            else:
-                return None
-        elif feature.geometry_type == "MultiPolygon":
-            # Use the largest polygon (first one typically)
-            if feature.coordinates and len(feature.coordinates) > 0:
-                # Find the polygon with the most points
-                largest = max(feature.coordinates, key=lambda p: len(p[0]) if p else 0)
-                coords = largest[0] if largest else []
-            else:
-                return None
-        else:
-            return None
-
-        if not coords or len(coords) < 3:
-            return None
-
-        # Convert coordinates to Points
-        # GeoJSON is [longitude, latitude]
-        points = [Point(coord[0], coord[1]) for coord in coords if len(coord) >= 2]
-
-        if len(points) < 3:
             return None
 
         # Determine color based on entity name
@@ -388,22 +360,103 @@ class BoundaryEngine:
                 )
                 break
 
-        # Calculate centroid for label
+        polygons = []
+
+        # Extract coordinates based on geometry type
+        if feature.geometry_type == "Polygon":
+            # Use the first ring (exterior boundary)
+            if feature.coordinates and len(feature.coordinates) > 0:
+                coords = feature.coordinates[0]
+                polygon = self._create_polygon_from_coords(
+                    coords, name, fill_color, entity_match, feature.properties
+                )
+                if polygon:
+                    polygons.append(polygon)
+
+        elif feature.geometry_type == "MultiPolygon":
+            # Include all polygon parts that are large enough
+            if feature.coordinates:
+                # Calculate areas for all parts to filter small islands
+                parts_with_area = []
+                for part in feature.coordinates:
+                    if part and len(part) > 0 and len(part[0]) >= 3:
+                        coords = part[0]
+                        area = self._estimate_geojson_area(coords)
+                        parts_with_area.append((coords, area))
+
+                # Sort by area, largest first
+                parts_with_area.sort(key=lambda x: x[1], reverse=True)
+
+                # Include the largest parts (up to 5 to avoid too many tiny islands)
+                # Also include any part that's at least 5% of the largest
+                if parts_with_area:
+                    max_area = parts_with_area[0][1]
+                    threshold = max_area * 0.05  # 5% of largest
+
+                    for i, (coords, area) in enumerate(parts_with_area):
+                        # Include top 5, or any that are at least 5% of largest
+                        if i < 5 or area >= threshold:
+                            polygon = self._create_polygon_from_coords(
+                                coords, name, fill_color, entity_match,
+                                feature.properties, is_part=(i > 0)
+                            )
+                            if polygon:
+                                polygons.append(polygon)
+
+        return polygons if polygons else None
+
+    def _create_polygon_from_coords(
+        self,
+        coords: List,
+        name: str,
+        fill_color: str,
+        entity_match: Optional[ResolvedEntity],
+        properties: Dict,
+        is_part: bool = False
+    ) -> Optional[Polygon]:
+        """Create a Polygon from coordinate list."""
+        if not coords or len(coords) < 3:
+            return None
+
+        # Convert coordinates to Points
+        # GeoJSON is [longitude, latitude]
+        points = [Point(coord[0], coord[1]) for coord in coords if len(coord) >= 2]
+
+        if len(points) < 3:
+            return None
+
+        # Calculate centroid for label (only for main polygon, not parts)
         centroid = self._calculate_centroid(points)
 
         return Polygon(
             points=points,
-            entity_name=name,
+            entity_name=name if not is_part else "",  # Only label main polygon
             entity_type='country',
             fill_color=fill_color,
             border_color='#333333',
-            label_position=centroid,
+            label_position=centroid if not is_part else None,
             uncertainty=0.1 if entity_match else 0.0,
             metadata={
                 'source': 'geojson',
-                'properties': feature.properties
+                'properties': properties,
+                'is_part': is_part
             }
         )
+
+    def _estimate_geojson_area(self, coords: List) -> float:
+        """Estimate area of a polygon from GeoJSON coordinates using shoelace formula."""
+        if len(coords) < 3:
+            return 0.0
+
+        n = len(coords)
+        area = 0.0
+        for i in range(n):
+            j = (i + 1) % n
+            # coords are [lon, lat]
+            area += coords[i][0] * coords[j][1]
+            area -= coords[j][0] * coords[i][1]
+
+        return abs(area) / 2.0
 
     def _calculate_centroid(self, points: List[Point]) -> Point:
         """Calculate the centroid of a polygon."""

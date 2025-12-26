@@ -48,6 +48,7 @@ class GameRoundResponse(BaseModel):
     round_id: str
     map_description: str
     difficulty: str
+    map_image: Optional[str] = None  # Base64 encoded SVG/PNG image
 
 
 class GameSubmitRequest(BaseModel):
@@ -214,6 +215,16 @@ async def analyze_map(file: UploadFile = File(...)):
             evidence=evidence_list
         )
 
+    except ValueError as e:
+        # Handle specific analysis errors (like "No historical entities found")
+        error_msg = str(e)
+        print(f"Analysis error: {error_msg}")
+        if "No historical entities found" in error_msg:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not identify any historical features on this map. Please upload a clear image of a historical map with visible country names, borders, or other datable features."
+            )
+        raise HTTPException(status_code=400, detail=f"Analysis error: {error_msg}")
     except Exception as e:
         print(f"Error analyzing map: {e}")
         import traceback
@@ -230,7 +241,7 @@ async def start_game_round(difficulty: str = "beginner"):
         difficulty: One of 'beginner', 'intermediate', 'expert'
 
     Returns:
-        GameRoundResponse with round info
+        GameRoundResponse with round info and map image
     """
     try:
         # Convert difficulty string to enum
@@ -253,14 +264,31 @@ async def start_game_round(difficulty: str = "beginner"):
         game_round = engine.start_new_round(difficulty=diff_level, use_mock=True)
 
         # Get description from metadata
-        description = "Cold War era political map showing divided Europe"
+        description = "Historical political map"
         if hasattr(game_round, "map_metadata") and game_round.map_metadata and game_round.map_metadata.description:
             description = game_round.map_metadata.description
+
+        # Generate a map image for this round using the system estimate year
+        map_image_base64 = None
+        try:
+            # Get the year from the system estimate
+            target_year = game_round.system_estimate.most_likely_year
+            if target_year:
+                # Generate map for this year
+                map_result = generate_map_from_date(str(target_year), output_format="svg")
+                if map_result and map_result.image_data:
+                    map_image_base64 = base64.b64encode(map_result.image_data).decode('utf-8')
+                    # Update description based on the map
+                    description = f"Historical world map from the {target_year}s era"
+        except Exception as map_error:
+            print(f"Warning: Could not generate map image: {map_error}")
+            # Continue without map image - frontend will show placeholder
 
         return GameRoundResponse(
             round_id=game_round.round_id,
             map_description=description,
-            difficulty=difficulty
+            difficulty=difficulty,
+            map_image=map_image_base64
         )
 
     except HTTPException:
@@ -288,19 +316,13 @@ async def submit_game_guess(request: GameSubmitRequest):
         engine = get_game_engine()
 
         # Create user guess
+        from models import YearRange
         if isinstance(request.guess, int):
             # Single year guess
-            user_guess = UserGuess(
-                is_single_year=True,
-                single_year=request.guess,
-                year_range=None
-            )
+            user_guess = UserGuess(year=request.guess)
         else:
             # Range guess
-            from models import YearRange
             user_guess = UserGuess(
-                is_single_year=False,
-                single_year=None,
                 year_range=YearRange(start=request.guess[0], end=request.guess[1])
             )
 
@@ -308,10 +330,16 @@ async def submit_game_guess(request: GameSubmitRequest):
         result = engine.submit_guess(user_guess)
 
         # Convert to response format
+        # result.score is a ScoreBreakdown object, extract final_score
+        final_score = int(result.score.final_score) if hasattr(result.score, 'final_score') else int(result.score)
+
+        # result.feedback can be a string or list
+        feedback_list = result.feedback if isinstance(result.feedback, list) else [result.feedback]
+
         return GameResultResponse(
-            score=result.score,
+            score=final_score,
             was_accurate=result.was_accurate,
-            feedback=result.feedback,
+            feedback=feedback_list,
             system_estimate={
                 "range": (
                     result.system_estimate.year_range.start,
