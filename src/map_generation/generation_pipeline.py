@@ -113,7 +113,9 @@ class MapGenerationPipeline:
         self,
         date_input: str,
         output_path: Optional[str] = None,
-        output_format: str = 'png'
+        output_format: str = 'png',
+        title: Optional[str] = None,
+        hide_date_in_title: bool = False
     ) -> GeneratedMapResult:
         """
         Generate a historical map from a date input.
@@ -122,6 +124,8 @@ class MapGenerationPipeline:
             date_input: Date string (e.g., "1914" or "1918-1939")
             output_path: Optional path to save the image
             output_format: 'png' or 'svg'
+            title: Custom title for the map (None = auto-generate)
+            hide_date_in_title: If True, use generic title without revealing the date
 
         Returns:
             GeneratedMapResult with image and metadata
@@ -171,9 +175,14 @@ class MapGenerationPipeline:
         if self.verbose:
             print("  [5/5] Rendering map...")
 
-        # Set title
-        title = f"Historical Map: {parsed_date.year_range}"
-        self.map_renderer.config.title = title
+        # Set title - can be customized or hidden for game mode
+        if title is not None:
+            map_title = title
+        elif hide_date_in_title:
+            map_title = "Historical World Map"
+        else:
+            map_title = f"Historical Map: {parsed_date.year_range}"
+        self.map_renderer.config.title = map_title
 
         if output_format.lower() == 'svg':
             image_data = self.map_renderer._render_as_svg(boundaries).encode('utf-8')
@@ -296,7 +305,9 @@ def generate_map_from_date(
     output_path: Optional[str] = None,
     output_format: str = 'png',
     verbose: bool = False,
-    render_config: Optional[RenderConfig] = None
+    render_config: Optional[RenderConfig] = None,
+    title: Optional[str] = None,
+    hide_date_in_title: bool = False
 ) -> GeneratedMapResult:
     """
     Generate a historical map from a date input.
@@ -309,6 +320,8 @@ def generate_map_from_date(
         output_format: 'png' or 'svg' (default: 'png')
         verbose: Whether to print progress messages
         render_config: Optional rendering configuration
+        title: Custom title for the map (None = auto-generate)
+        hide_date_in_title: If True, use generic title without revealing the date
 
     Returns:
         GeneratedMapResult containing:
@@ -340,4 +353,4 @@ def generate_map_from_date(
         render_config=render_config,
         verbose=verbose
     )
-    return pipeline.generate(date_input, output_path, output_format)
+    return pipeline.generate(date_input, output_path, output_format, title, hide_date_in_title)

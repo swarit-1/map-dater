@@ -1,13 +1,13 @@
 {
   "player_id": "default",
-  "rounds_played": 5,
-  "total_score": 357.1428571428571,
-  "accurate_guesses": 4,
-  "exact_guesses": 3,
-  "beginner_rounds": 5,
+  "rounds_played": 6,
+  "total_score": 457.1428571428571,
+  "accurate_guesses": 5,
+  "exact_guesses": 4,
+  "beginner_rounds": 6,
   "intermediate_rounds": 0,
   "expert_rounds": 0,
-  "avg_years_off": 6.6,
+  "avg_years_off": 5.5,
   "frequently_missed_signals": {
     "Country: East Germany": 1
   }

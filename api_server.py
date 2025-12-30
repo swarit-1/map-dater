@@ -243,6 +243,8 @@ async def start_game_round(difficulty: str = "beginner"):
     Returns:
         GameRoundResponse with round info and map image
     """
+    import random
+
     try:
         # Convert difficulty string to enum
         difficulty_map = {
@@ -259,30 +261,101 @@ async def start_game_round(difficulty: str = "beginner"):
 
         diff_level = difficulty_map[difficulty]
 
-        # Get game engine and start round
-        engine = get_game_engine()
-        game_round = engine.start_new_round(difficulty=diff_level, use_mock=True)
+        # Generate a random year based on difficulty
+        # Beginner: Major periods with clear identifiable features (1945+)
+        # Intermediate: More challenging periods (1920-1960)
+        # Expert: Any period including pre-WWII
+        if diff_level == DifficultyLevel.BEGINNER:
+            # Post-WWII era with clear Cold War divisions
+            target_year = random.choice([1950, 1955, 1960, 1965, 1970, 1975, 1980, 1985])
+        elif diff_level == DifficultyLevel.INTERMEDIATE:
+            # Interwar and early Cold War
+            target_year = random.choice([1920, 1925, 1930, 1935, 1950, 1955, 1990, 1995, 2000])
+        else:  # Expert
+            # Any era including challenging transitions
+            target_year = random.choice([1914, 1918, 1922, 1938, 1945, 1949, 1989, 1991, 2010])
 
-        # Get description from metadata
-        description = "Historical political map"
-        if hasattr(game_round, "map_metadata") and game_round.map_metadata and game_round.map_metadata.description:
-            description = game_round.map_metadata.description
-
-        # Generate a map image for this round using the system estimate year
+        # Generate a map image for this year with date hidden
         map_image_base64 = None
+        description = "Examine this historical world map and guess when it was created"
         try:
-            # Get the year from the system estimate
-            target_year = game_round.system_estimate.most_likely_year
-            if target_year:
-                # Generate map for this year
-                map_result = generate_map_from_date(str(target_year), output_format="svg")
-                if map_result and map_result.image_data:
-                    map_image_base64 = base64.b64encode(map_result.image_data).decode('utf-8')
-                    # Update description based on the map
-                    description = f"Historical world map from the {target_year}s era"
+            # Generate map with hidden date
+            map_result = generate_map_from_date(
+                str(target_year),
+                output_format="svg",
+                hide_date_in_title=True
+            )
+            if map_result and map_result.image_data:
+                map_image_base64 = base64.b64encode(map_result.image_data).decode('utf-8')
         except Exception as map_error:
             print(f"Warning: Could not generate map image: {map_error}")
             # Continue without map image - frontend will show placeholder
+
+        # Get game engine and start round with the generated year
+        engine = get_game_engine()
+
+        # Create a custom mock round with the random year
+        from knowledge import HistoricalKnowledgeBase
+        from models import DateEstimate, DateSignal, SignalType, YearRange
+        from game.game_models import GameRound, MapMetadata
+
+        kb = HistoricalKnowledgeBase()
+
+        # Find entities valid for this year
+        valid_entities = []
+        for name in ['USSR', 'Soviet Union', 'East Germany', 'West Germany',
+                     'Yugoslavia', 'Czechoslovakia', 'Ottoman Empire', 'Austria-Hungary']:
+            entity = kb.find_by_name(name)
+            if entity and entity.valid_range.start <= target_year <= entity.valid_range.end:
+                valid_entities.append(entity)
+
+        # Create signals from valid entities
+        signals = []
+        for entity in valid_entities[:5]:  # Limit to 5 signals
+            signal = DateSignal(
+                signal_type=SignalType.ENTITY,
+                description=f"{entity.entity_type.capitalize()}: {entity.canonical_name}",
+                year_range=entity.valid_range,
+                confidence=0.95,
+                source=f"entity:{entity.canonical_name}",
+                reasoning=f"{entity.canonical_name} existed from {entity.valid_range.start} to {entity.valid_range.end}"
+            )
+            signals.append(signal)
+
+        # Calculate the year range based on entity overlaps
+        if valid_entities:
+            range_start = max(e.valid_range.start for e in valid_entities)
+            range_end = min(e.valid_range.end for e in valid_entities)
+        else:
+            range_start = target_year - 10
+            range_end = target_year + 10
+
+        # Create estimate
+        estimate = DateEstimate(
+            year_range=YearRange(range_start, range_end),
+            confidence=0.85,
+            signals=signals,
+            explanation="Estimated based on political entities visible on map",
+            most_likely_year=target_year
+        )
+
+        # Create mock metadata
+        map_metadata = MapMetadata(
+            map_id=f"game_{target_year}_{random.randint(1000, 9999)}",
+            source="Generated Map",
+            region="World",
+            description=description
+        )
+
+        # Create game round
+        game_round = GameRound.create(
+            map_metadata=map_metadata,
+            system_estimate=estimate,
+            difficulty=diff_level
+        )
+
+        # Store in engine for later submission
+        engine.current_round = game_round
 
         return GameRoundResponse(
             round_id=game_round.round_id,
