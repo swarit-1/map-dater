@@ -29,8 +29,9 @@ class ScoreCalculator:
     # Difficulty multipliers
     DIFFICULTY_MULTIPLIERS = {
         DifficultyLevel.BEGINNER: 1.0,
-        DifficultyLevel.INTERMEDIATE: 1.3,
-        DifficultyLevel.EXPERT: 1.6
+        DifficultyLevel.INTERMEDIATE: 1.25,
+        DifficultyLevel.ADVANCED: 1.5,
+        DifficultyLevel.GEOGRAPHIC_GOD: 2.0,
     }
 
     def __init__(self):

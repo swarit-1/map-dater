@@ -33,6 +33,7 @@ class RenderConfig:
         show_uncertainty: Whether to show uncertainty regions
         title: Optional title for the map
         style: Rendering style ('antique', 'modern', 'simple')
+        viewport: Optional viewport bounds (min_lon, max_lon, min_lat, max_lat)
     """
     width: int = 1200
     height: int = 800
@@ -46,6 +47,21 @@ class RenderConfig:
     style: str = 'antique'
     font_size: int = 12
     title_font_size: int = 24
+    viewport: Optional[Tuple[float, float, float, float]] = None  # (min_lon, max_lon, min_lat, max_lat)
+
+
+# Predefined region viewports (min_lon, max_lon, min_lat, max_lat)
+REGION_VIEWPORTS = {
+    'world': (-180, 180, -60, 85),
+    'europe': (-25, 50, 34, 72),
+    'asia': (25, 150, -10, 55),
+    'africa': (-25, 55, -38, 40),
+    'americas': (-170, -30, -60, 75),
+    'north_america': (-170, -50, 10, 75),
+    'south_america': (-90, -30, -60, 15),
+    'middle_east': (25, 75, 10, 45),
+    'oceania': (100, 180, -50, 10),
+}
 
 
 class MapRenderer:
@@ -100,6 +116,15 @@ class MapRenderer:
             self.ANTIQUE_PALETTE if self.config.style == 'antique'
             else self.MODERN_PALETTE
         )
+
+        # Set viewport bounds from config or use defaults
+        if self.config.viewport:
+            self._min_lon, self._max_lon, self._min_lat, self._max_lat = self.config.viewport
+        else:
+            self._min_lon = self.MIN_LON
+            self._max_lon = self.MAX_LON
+            self._min_lat = self.MIN_LAT
+            self._max_lat = self.MAX_LAT
 
     def render(
         self,
@@ -330,10 +355,16 @@ class MapRenderer:
             f'    .city {{ fill: #8B4513; stroke: #000000; stroke-width: 1; }}',
             f'    .grid {{ stroke: {self._palette["grid"]}; stroke-width: 0.5; }}',
             '  </style>',
+            f'  <clipPath id="viewport-clip">',
+            f'    <rect x="0" y="0" width="{self.config.width}" height="{self.config.height}"/>',
+            f'  </clipPath>',
             '</defs>',
             '',
             '<!-- Background (Ocean) -->',
             f'<rect class="ocean" width="100%" height="100%"/>',
+            '',
+            '<!-- Map content clipped to viewport -->',
+            '<g clip-path="url(#viewport-clip)">',
             '',
         ]
 
@@ -427,7 +458,11 @@ class MapRenderer:
                     )
             svg_parts.append('')
 
-        # Title
+        svg_parts.append('')
+        svg_parts.append('</g><!-- End clipped content -->')
+        svg_parts.append('')
+
+        # Title (outside clip group so always visible)
         title = self.config.title or f"World Map: {boundaries.date_range}"
         svg_parts.append('<!-- Title -->')
         svg_parts.append(
@@ -459,11 +494,16 @@ class MapRenderer:
 
     def _lon_to_x(self, lon: float) -> float:
         """Convert longitude to x pixel coordinate."""
-        return (lon - self.MIN_LON) / (self.MAX_LON - self.MIN_LON) * self.config.width
+        return (lon - self._min_lon) / (self._max_lon - self._min_lon) * self.config.width
 
     def _lat_to_y(self, lat: float) -> float:
         """Convert latitude to y pixel coordinate (inverted for screen coords)."""
-        return (self.MAX_LAT - lat) / (self.MAX_LAT - self.MIN_LAT) * self.config.height
+        return (self._max_lat - lat) / (self._max_lat - self._min_lat) * self.config.height
+
+    def _is_point_in_viewport(self, lon: float, lat: float) -> bool:
+        """Check if a point is within the current viewport."""
+        return (self._min_lon <= lon <= self._max_lon and
+                self._min_lat <= lat <= self._max_lat)
 
     def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
         """Convert hex color to RGB tuple."""

@@ -1,14 +1,17 @@
 {
   "player_id": "default",
-  "rounds_played": 6,
-  "total_score": 457.1428571428571,
-  "accurate_guesses": 5,
-  "exact_guesses": 4,
-  "beginner_rounds": 6,
-  "intermediate_rounds": 0,
-  "expert_rounds": 0,
-  "avg_years_off": 5.5,
+  "rounds_played": 13,
+  "total_score": 932.1428571428571,
+  "accurate_guesses": 10,
+  "exact_guesses": 10,
+  "beginner_rounds": 9,
+  "intermediate_rounds": 2,
+  "expert_rounds": 2,
+  "avg_years_off": 10.692307692307692,
   "frequently_missed_signals": {
-    "Country: East Germany": 1
+    "Country: East Germany": 1,
+    "Country: Soviet Union": 2,
+    "Country: Yugoslavia": 1,
+    "Country: Czechoslovakia": 2
   }
 }

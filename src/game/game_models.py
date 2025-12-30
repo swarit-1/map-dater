@@ -19,7 +19,33 @@ class DifficultyLevel(Enum):
     """Difficulty tiers for map dating challenges."""
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
-    EXPERT = "expert"
+    ADVANCED = "advanced"
+    GEOGRAPHIC_GOD = "geographic_god"
+
+
+# Difficulty configuration for scoring
+DIFFICULTY_CONFIG = {
+    DifficultyLevel.BEGINNER: {
+        "tolerance_years": 20,  # Within 20 years for full accuracy bonus
+        "base_multiplier": 1.0,
+        "description": "Obvious historical markers (Cold War divisions, major empires)",
+    },
+    DifficultyLevel.INTERMEDIATE: {
+        "tolerance_years": 10,  # Within 10 years for full accuracy bonus
+        "base_multiplier": 1.25,
+        "description": "Requires knowledge of interwar period and decolonization",
+    },
+    DifficultyLevel.ADVANCED: {
+        "tolerance_years": 5,  # Within 5 years for full accuracy bonus
+        "base_multiplier": 1.5,
+        "description": "Transitional periods with subtle boundary changes",
+    },
+    DifficultyLevel.GEOGRAPHIC_GOD: {
+        "tolerance_years": 2,  # Within 2 years for full accuracy bonus
+        "base_multiplier": 2.0,
+        "description": "Specific treaty years, short-lived states, obscure changes",
+    },
+}
 
 
 @dataclass

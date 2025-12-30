@@ -115,7 +115,8 @@ class MapGenerationPipeline:
         output_path: Optional[str] = None,
         output_format: str = 'png',
         title: Optional[str] = None,
-        hide_date_in_title: bool = False
+        hide_date_in_title: bool = False,
+        region: Optional[str] = None
     ) -> GeneratedMapResult:
         """
         Generate a historical map from a date input.
@@ -126,6 +127,7 @@ class MapGenerationPipeline:
             output_format: 'png' or 'svg'
             title: Custom title for the map (None = auto-generate)
             hide_date_in_title: If True, use generic title without revealing the date
+            region: Optional region to zoom into ('world', 'europe', 'asia', 'africa', 'americas')
 
         Returns:
             GeneratedMapResult with image and metadata
@@ -134,6 +136,14 @@ class MapGenerationPipeline:
             DateParseError: If the date input is invalid
             ValueError: If generation fails
         """
+        # Import region viewports
+        from .map_renderer import REGION_VIEWPORTS
+
+        # Configure viewport for region if specified
+        if region and region in REGION_VIEWPORTS:
+            self.render_config.viewport = REGION_VIEWPORTS[region]
+            # Recreate renderer with new viewport
+            self.map_renderer = MapRenderer(self.render_config)
         if self.verbose:
             print(f"Generating map for: {date_input}")
 
@@ -307,7 +317,8 @@ def generate_map_from_date(
     verbose: bool = False,
     render_config: Optional[RenderConfig] = None,
     title: Optional[str] = None,
-    hide_date_in_title: bool = False
+    hide_date_in_title: bool = False,
+    region: Optional[str] = None
 ) -> GeneratedMapResult:
     """
     Generate a historical map from a date input.
@@ -322,6 +333,7 @@ def generate_map_from_date(
         render_config: Optional rendering configuration
         title: Custom title for the map (None = auto-generate)
         hide_date_in_title: If True, use generic title without revealing the date
+        region: Optional region to zoom into ('world', 'europe', 'asia', 'africa', 'americas')
 
     Returns:
         GeneratedMapResult containing:
@@ -344,7 +356,7 @@ def generate_map_from_date(
         >>> print(result.entities_shown)
         [{'name': 'Soviet Union', ...}, ...]
 
-        >>> result = generate_map_from_date("1949", verbose=True)
+        >>> result = generate_map_from_date("1949", verbose=True, region="europe")
         Generating map for: 1949
           [1/5] Parsing date input...
           ...
@@ -353,4 +365,4 @@ def generate_map_from_date(
         render_config=render_config,
         verbose=verbose
     )
-    return pipeline.generate(date_input, output_path, output_format, title, hide_date_in_title)
+    return pipeline.generate(date_input, output_path, output_format, title, hide_date_in_title, region)

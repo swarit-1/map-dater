@@ -48,7 +48,9 @@ class GameRoundResponse(BaseModel):
     round_id: str
     map_description: str
     difficulty: str
+    region: str = "world"  # "world", "europe", "asia", "africa", "americas"
     map_image: Optional[str] = None  # Base64 encoded SVG/PNG image
+    hints: Optional[List[str]] = None  # Optional hints based on difficulty
 
 
 class GameSubmitRequest(BaseModel):
@@ -233,12 +235,16 @@ async def analyze_map(file: UploadFile = File(...)):
 
 
 @app.post("/game/start", response_model=GameRoundResponse)
-async def start_game_round(difficulty: str = "beginner"):
+async def start_game_round(
+    difficulty: str = "beginner",
+    region: str = "world"
+):
     """
     Start a new game round.
 
     Args:
-        difficulty: One of 'beginner', 'intermediate', 'expert'
+        difficulty: One of 'beginner', 'intermediate', 'advanced', 'geographic_god'
+        region: One of 'world', 'europe', 'asia', 'africa', 'americas'
 
     Returns:
         GameRoundResponse with round info and map image
@@ -250,8 +256,11 @@ async def start_game_round(difficulty: str = "beginner"):
         difficulty_map = {
             "beginner": DifficultyLevel.BEGINNER,
             "intermediate": DifficultyLevel.INTERMEDIATE,
-            "expert": DifficultyLevel.EXPERT
+            "advanced": DifficultyLevel.ADVANCED,
+            "geographic_god": DifficultyLevel.GEOGRAPHIC_GOD
         }
+
+        valid_regions = ["world", "europe", "asia", "africa", "americas"]
 
         if difficulty not in difficulty_map:
             raise HTTPException(
@@ -259,31 +268,74 @@ async def start_game_round(difficulty: str = "beginner"):
                 detail=f"Invalid difficulty. Must be one of: {list(difficulty_map.keys())}"
             )
 
+        if region not in valid_regions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid region. Must be one of: {valid_regions}"
+            )
+
         diff_level = difficulty_map[difficulty]
 
         # Generate a random year based on difficulty
-        # Beginner: Major periods with clear identifiable features (1945+)
-        # Intermediate: More challenging periods (1920-1960)
-        # Expert: Any period including pre-WWII
+        # Each level has more diverse and challenging years
         if diff_level == DifficultyLevel.BEGINNER:
-            # Post-WWII era with clear Cold War divisions
-            target_year = random.choice([1950, 1955, 1960, 1965, 1970, 1975, 1980, 1985])
+            # Post-WWII era with clear Cold War divisions - obvious markers
+            target_year = random.choice([
+                1950, 1955, 1960, 1965, 1970, 1975, 1980, 1985,  # Cold War
+                2000, 2005, 2010, 2015,  # Modern era
+            ])
         elif diff_level == DifficultyLevel.INTERMEDIATE:
-            # Interwar and early Cold War
-            target_year = random.choice([1920, 1925, 1930, 1935, 1950, 1955, 1990, 1995, 2000])
-        else:  # Expert
-            # Any era including challenging transitions
-            target_year = random.choice([1914, 1918, 1922, 1938, 1945, 1949, 1989, 1991, 2010])
+            # Interwar, decolonization, and post-Cold War transitions
+            target_year = random.choice([
+                1920, 1925, 1930, 1935,  # Interwar period
+                1946, 1947, 1948,  # Post-WWII immediate
+                1960, 1962, 1965,  # Decolonization
+                1990, 1992, 1995,  # Post-Cold War
+                2000, 2008,  # Modern
+            ])
+        elif diff_level == DifficultyLevel.ADVANCED:
+            # Transition years with subtle changes
+            target_year = random.choice([
+                1914, 1916, 1918,  # WWI
+                1919, 1920, 1921, 1922,  # Post-WWI reshaping
+                1936, 1938, 1939,  # Pre-WWII expansion
+                1945, 1946, 1947, 1948, 1949,  # Post-WWII
+                1989, 1990, 1991,  # Fall of communism
+                1993, 1999, 2003,  # Yugoslav wars, EU expansion
+            ])
+        else:  # GEOGRAPHIC_GOD
+            # Specific treaty years and short-lived states
+            target_year = random.choice([
+                1912, 1913,  # Balkan Wars
+                1914, 1917, 1918,  # WWI changes
+                1919, 1920, 1921,  # Treaty years (Versailles, Trianon, etc.)
+                1922, 1923,  # Ottoman dissolution, USSR formation
+                1938, 1939, 1940,  # Anschluss, Munich, partition
+                1941, 1943, 1944, 1945,  # WWII territorial changes
+                1947, 1948, 1949,  # Partition of India, Israel, Germany splits
+                1989, 1990, 1991, 1992,  # Fall of Berlin Wall, USSR dissolution
+                1993, 1995, 1999, 2006, 2008,  # Yugoslavia breakup, Kosovo
+            ])
 
-        # Generate a map image for this year with date hidden
+        # Region-specific descriptions
+        region_descriptions = {
+            "world": "Examine this historical world map and guess when it was created",
+            "europe": "Examine this historical map of Europe and guess when it was created",
+            "asia": "Examine this historical map of Asia and guess when it was created",
+            "africa": "Examine this historical map of Africa and guess when it was created",
+            "americas": "Examine this historical map of the Americas and guess when it was created",
+        }
+        description = region_descriptions.get(region, region_descriptions["world"])
+
+        # Generate a map image for this year with date hidden and region zoom
         map_image_base64 = None
-        description = "Examine this historical world map and guess when it was created"
         try:
-            # Generate map with hidden date
+            # Generate map with hidden date and optional region zoom
             map_result = generate_map_from_date(
                 str(target_year),
                 output_format="svg",
-                hide_date_in_title=True
+                hide_date_in_title=True,
+                region=region if region != "world" else None  # Only zoom for specific regions
             )
             if map_result and map_result.image_data:
                 map_image_base64 = base64.b64encode(map_result.image_data).decode('utf-8')
@@ -297,14 +349,50 @@ async def start_game_round(difficulty: str = "beginner"):
         # Create a custom mock round with the random year
         from knowledge import HistoricalKnowledgeBase
         from models import DateEstimate, DateSignal, SignalType, YearRange
-        from game.game_models import GameRound, MapMetadata
+        from game.game_models import GameRound, MapMetadata, DIFFICULTY_CONFIG
 
         kb = HistoricalKnowledgeBase()
 
+        # Expanded entity list covering many historical eras
+        # Organized by region for region-specific games
+        entities_by_region = {
+            "world": [
+                'USSR', 'Soviet Union', 'East Germany', 'West Germany',
+                'Yugoslavia', 'Czechoslovakia', 'Ottoman Empire', 'Austria-Hungary',
+                'Prussia', 'German Empire', 'British Empire', 'French Empire',
+                'Qing Dynasty', 'Republic of China', 'Manchukuo',
+                'British India', 'Pakistan', 'Bangladesh',
+            ],
+            "europe": [
+                'USSR', 'Soviet Union', 'East Germany', 'West Germany',
+                'Yugoslavia', 'Czechoslovakia', 'Austria-Hungary', 'Prussia',
+                'German Empire', 'Ottoman Empire', 'Kingdom of Serbia',
+                'Kingdom of Hungary', 'Poland-Lithuania', 'Russian Empire',
+                'Weimar Republic', 'Nazi Germany', 'Vichy France',
+            ],
+            "asia": [
+                'Ottoman Empire', 'Qing Dynasty', 'Republic of China',
+                'Manchukuo', 'British India', 'French Indochina',
+                'Dutch East Indies', 'Empire of Japan', 'Korea',
+                'North Korea', 'South Korea', 'North Vietnam', 'South Vietnam',
+            ],
+            "africa": [
+                'British Empire', 'French Empire', 'Belgian Congo',
+                'German East Africa', 'Italian Libya', 'Rhodesia',
+                'South West Africa', 'Tanganyika', 'Gold Coast',
+            ],
+            "americas": [
+                'New Spain', 'British America', 'Confederate States',
+                'Republic of Texas', 'Gran Colombia', 'United Provinces',
+            ],
+        }
+
+        # Get entities for the selected region (with world as fallback)
+        entity_names = entities_by_region.get(region, entities_by_region["world"])
+
         # Find entities valid for this year
         valid_entities = []
-        for name in ['USSR', 'Soviet Union', 'East Germany', 'West Germany',
-                     'Yugoslavia', 'Czechoslovakia', 'Ottoman Empire', 'Austria-Hungary']:
+        for name in entity_names:
             entity = kb.find_by_name(name)
             if entity and entity.valid_range.start <= target_year <= entity.valid_range.end:
                 valid_entities.append(entity)
@@ -343,7 +431,7 @@ async def start_game_round(difficulty: str = "beginner"):
         map_metadata = MapMetadata(
             map_id=f"game_{target_year}_{random.randint(1000, 9999)}",
             source="Generated Map",
-            region="World",
+            region=region.capitalize(),
             description=description
         )
 
@@ -357,11 +445,28 @@ async def start_game_round(difficulty: str = "beginner"):
         # Store in engine for later submission
         engine.current_round = game_round
 
+        # Generate hints based on difficulty (fewer hints for harder difficulties)
+        hints = None
+        if diff_level == DifficultyLevel.BEGINNER:
+            hints = [
+                "Look for major Cold War divisions (East vs West)",
+                "Check if the Soviet Union or unified Germany exists",
+                f"This map shows the {region} region",
+            ]
+        elif diff_level == DifficultyLevel.INTERMEDIATE:
+            hints = [
+                "Pay attention to decolonization patterns",
+                "Look for interwar period boundaries",
+            ]
+        # Advanced and Geographic God get no hints
+
         return GameRoundResponse(
             round_id=game_round.round_id,
             map_description=description,
             difficulty=difficulty,
-            map_image=map_image_base64
+            region=region,
+            map_image=map_image_base64,
+            hints=hints
         )
 
     except HTTPException:

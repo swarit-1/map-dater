@@ -4,9 +4,40 @@ import { GameMapFrame } from '../components/GameMapFrame';
 import { ScoreSeal } from '../components/ScoreSeal';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { startGameRound, submitGuess } from '../api/mapDaterApi';
-import type { GameRoundResponse, GameResultResponse } from '../api/mapDaterApi';
+import type { GameRoundResponse, GameResultResponse, Difficulty, Region } from '../api/mapDaterApi';
 
 type GuessType = 'single' | 'range';
+
+const DIFFICULTY_INFO: Record<Difficulty, { label: string; description: string; color: string }> = {
+  beginner: {
+    label: 'Beginner',
+    description: 'Clear Cold War divisions, major empires',
+    color: 'bg-green-100 border-green-400 text-green-800',
+  },
+  intermediate: {
+    label: 'Intermediate',
+    description: 'Interwar period, decolonization',
+    color: 'bg-yellow-100 border-yellow-400 text-yellow-800',
+  },
+  advanced: {
+    label: 'Advanced',
+    description: 'Transitional periods, subtle changes',
+    color: 'bg-orange-100 border-orange-400 text-orange-800',
+  },
+  geographic_god: {
+    label: 'Geographic God',
+    description: 'Treaty years, short-lived states',
+    color: 'bg-red-100 border-red-400 text-red-800',
+  },
+};
+
+const REGION_INFO: Record<Region, { label: string; icon: string }> = {
+  world: { label: 'World', icon: '🌍' },
+  europe: { label: 'Europe', icon: '🇪🇺' },
+  asia: { label: 'Asia', icon: '🌏' },
+  africa: { label: 'Africa', icon: '🌍' },
+  americas: { label: 'Americas', icon: '🌎' },
+};
 
 export function Game() {
   const [gameRound, setGameRound] = useState<GameRoundResponse | null>(null);
@@ -15,13 +46,14 @@ export function Game() {
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<GameResultResponse | null>(null);
   const [submittedGuess, setSubmittedGuess] = useState<number | [number, number] | null>(null);
 
-  useEffect(() => {
-    loadNewRound();
-  }, []);
+  // Game settings
+  const [difficulty, setDifficulty] = useState<Difficulty>('beginner');
+  const [region, setRegion] = useState<Region>('world');
+  const [showSetup, setShowSetup] = useState(true);
 
   const loadNewRound = async () => {
     setIsLoading(true);
@@ -30,9 +62,10 @@ export function Game() {
     setSingleYear('');
     setRangeStart('');
     setRangeEnd('');
+    setShowSetup(false);
 
     try {
-      const round = await startGameRound('beginner');
+      const round = await startGameRound(difficulty, region);
       setGameRound(round);
     } catch (error) {
       console.error('Error loading game round:', error);
@@ -122,6 +155,67 @@ export function Game() {
         </div>
       </div>
 
+      {/* Setup screen */}
+      {showSetup && !isLoading && (
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-parchment-50 border-2 border-sepia-400 rounded-lg p-8 shadow-paper">
+            <h2 className="text-2xl font-serif font-semibold text-ink mb-6 text-center">Game Settings</h2>
+
+            {/* Difficulty selector */}
+            <div className="mb-8">
+              <h3 className="text-lg font-serif text-sepia-700 mb-4">Select Difficulty</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {(Object.keys(DIFFICULTY_INFO) as Difficulty[]).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDifficulty(d)}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      difficulty === d
+                        ? DIFFICULTY_INFO[d].color + ' border-current'
+                        : 'bg-parchment-100 border-sepia-300 hover:border-sepia-400'
+                    }`}
+                  >
+                    <div className="font-serif font-semibold text-sm">{DIFFICULTY_INFO[d].label}</div>
+                    <div className="text-xs mt-1 opacity-80">{DIFFICULTY_INFO[d].description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Region selector */}
+            <div className="mb-8">
+              <h3 className="text-lg font-serif text-sepia-700 mb-4">Select Region</h3>
+              <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                {(Object.keys(REGION_INFO) as Region[]).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setRegion(r)}
+                    className={`p-4 rounded-lg border-2 transition-all text-center ${
+                      region === r
+                        ? 'bg-sepia-100 border-sepia-600'
+                        : 'bg-parchment-100 border-sepia-300 hover:border-sepia-400'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{REGION_INFO[r].icon}</div>
+                    <div className="font-serif text-sm">{REGION_INFO[r].label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Start button */}
+            <div className="text-center">
+              <button
+                onClick={loadNewRound}
+                className="px-8 py-4 bg-sepia-600 text-parchment-50 font-serif font-semibold text-lg rounded-lg shadow-paper hover:bg-sepia-700 hover:shadow-paper-lg transition-all"
+              >
+                Start Game
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Loading state */}
       {isLoading && (
         <div className="max-w-4xl mx-auto">
@@ -134,12 +228,34 @@ export function Game() {
       )}
 
       {/* Main content */}
-      {!isLoading && gameRound && (
+      {!isLoading && !showSetup && gameRound && (
         <div className="max-w-4xl mx-auto space-y-8">
+          {/* Difficulty and region badge */}
+          <div className="flex justify-center gap-4">
+            <span className={`px-3 py-1 rounded-full text-sm font-serif border ${DIFFICULTY_INFO[gameRound.difficulty as Difficulty]?.color || 'bg-gray-100'}`}>
+              {DIFFICULTY_INFO[gameRound.difficulty as Difficulty]?.label || gameRound.difficulty}
+            </span>
+            <span className="px-3 py-1 rounded-full text-sm font-serif bg-sepia-100 border border-sepia-400">
+              {REGION_INFO[gameRound.region as Region]?.icon} {REGION_INFO[gameRound.region as Region]?.label || gameRound.region}
+            </span>
+          </div>
+
           {/* Map display */}
           <div className="bg-parchment-50 border-2 border-sepia-400 rounded-lg p-8 shadow-paper">
             <GameMapFrame description={gameRound.map_description} difficulty={gameRound.difficulty} mapImage={gameRound.map_image} />
           </div>
+
+          {/* Hints (if available and before result) */}
+          {!result && gameRound.hints && gameRound.hints.length > 0 && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 shadow-paper">
+              <h3 className="text-sm font-serif font-semibold text-amber-800 mb-2">Hints</h3>
+              <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
+                {gameRound.hints.map((hint, i) => (
+                  <li key={i}>{hint}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Guess input (only show before submission) */}
           {!result && (
@@ -260,12 +376,23 @@ export function Game() {
               />
 
               {/* Action buttons */}
-              <div className="flex justify-center space-x-4">
+              <div className="flex flex-wrap justify-center gap-4">
                 <button
                   onClick={loadNewRound}
                   className="px-6 py-3 bg-sepia-600 text-parchment-50 font-serif font-semibold rounded-lg shadow-paper hover:shadow-paper-lg transition-all duration-200 hover:bg-sepia-700"
                 >
                   Play Again
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowSetup(true);
+                    setGameRound(null);
+                    setResult(null);
+                  }}
+                  className="px-6 py-3 bg-parchment-50 text-sepia-700 border-2 border-sepia-500 font-serif font-semibold rounded-lg shadow-paper hover:shadow-paper-lg transition-all duration-200 hover:bg-parchment-200"
+                >
+                  Change Settings
                 </button>
 
                 <Link

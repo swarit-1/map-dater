@@ -27,11 +27,16 @@ export interface DateEstimateResponse {
 // Game Types
 // =============================================================================
 
+export type Difficulty = 'beginner' | 'intermediate' | 'advanced' | 'geographic_god';
+export type Region = 'world' | 'europe' | 'asia' | 'africa' | 'americas';
+
 export interface GameRoundResponse {
   round_id: string;
   map_description: string;
-  difficulty: 'beginner' | 'intermediate' | 'expert';
+  difficulty: Difficulty;
+  region: Region;
   map_image: string | null;  // Base64 encoded SVG/PNG image
+  hints: string[] | null;  // Optional hints based on difficulty
 }
 
 export interface GameResultResponse {
@@ -138,9 +143,15 @@ export async function analyzeMap(file: File): Promise<DateEstimateResponse> {
  * Start a new game round
  */
 export async function startGameRound(
-  difficulty?: 'beginner' | 'intermediate' | 'expert'
+  difficulty: Difficulty = 'beginner',
+  region: Region = 'world'
 ): Promise<GameRoundResponse> {
-  const response = await fetch(`${API_BASE_URL}/game/start?difficulty=${difficulty || 'beginner'}`, {
+  const params = new URLSearchParams({
+    difficulty,
+    region,
+  });
+
+  const response = await fetch(`${API_BASE_URL}/game/start?${params}`, {
     method: 'POST',
   });
 
